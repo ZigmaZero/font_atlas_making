@@ -73,7 +73,31 @@ GenerateFontAtlasError GenerateFontAtlas(
             &yoff
         );
 
-        if (!bitmap) continue;
+        // Metrics are needed even for whitespace characters like space,
+        // which may have no visible bitmap.
+        int advance, lsb;
+        stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
+
+        // Handle glyphs with no bitmap (for example, space).
+        if (!bitmap || w == 0 || h == 0) {
+            Glyph g = {};
+            g.u0 = 0.0f;
+            g.v0 = 0.0f;
+            g.u1 = 0.0f;
+            g.v1 = 0.0f;
+            g.width = 0;
+            g.height = 0;
+            g.bearingX = xoff;
+            g.bearingY = -yoff;
+            g.advance = (float)advance * scale;
+
+            glyphs[c] = g;
+
+            if (bitmap) {
+                stbtt_FreeBitmap(bitmap, nullptr);
+            }
+            continue;
+        }
 
         // Line wrap
         if (penX + w >= atlasW) {
@@ -98,20 +122,17 @@ GenerateFontAtlasError GenerateFontAtlas(
         }
 
         // Metrics
-        int advance, lsb;
-        stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
-
         Glyph g = Glyph();
-        g.u0 = (float) penX / (float)atlasW;
-        g.v0 = (float) penY / (float)atlasH;
-        g.u1 = (float) (penX + w) / (float)atlasW;
-        g.v1 = (float) (penY + h) / (float)atlasH;
+        g.u0 = (float)penX / (float)atlasW;
+        g.v0 = (float)penY / (float)atlasH;
+        g.u1 = (float)(penX + w) / (float)atlasW;
+        g.v1 = (float)(penY + h) / (float)atlasH;
 
         g.width = w;
         g.height = h;
         g.bearingX = xoff;
-        g.bearingY = (int)(baseline + (float) yoff); // align to baseline
-        g.advance = (float) advance * scale;
+        g.bearingY = -yoff;
+        g.advance = (float)advance * scale;
 
         glyphs[c] = g;
 
